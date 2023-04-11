@@ -10,21 +10,23 @@ repository  = "https://github.com/meh/rust-xcb-util"
 keywords    = ["x11", "xcb"]
 
 [dependencies]
-libc = "0.2"
-xcb  = "0.10"
+xcb  = "1.2.0"
+xcb-util-sys = { version = "0.1.0", path = "xcb-util-sys" }
 
 [features]
-static = []
-shm    = ["xcb/shm"]
-thread = ["xcb/thread"]
+ewmh    = ["xcb-util-sys/ewmh"]
 
-icccm   = []
-ewmh    = []
-image   = []
 cursor  = []
+icccm   = []
+image   = []
 keysyms = []
 misc    = ["icccm"]
-render  = []
+render  = ["xcb/render"]
+
+shm    = ["xcb/shm"]
+thread = []
+
+static = []
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 extern crate xcb;
-extern crate libc;
+extern crate xcb_util_sys;
 
 pub mod ffi;
 

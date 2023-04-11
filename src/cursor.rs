@@ -80,23 +80,51 @@ pub const WATCH: u16 = 150;
 pub const XTERM: u16 = 152;
 
 pub fn create_font_cursor(c: &xcb::Connection, glyph: u16) -> xcb::Cursor {
-	let font = c.generate_id();
-	xcb::open_font(c, font, "cursor");
+    let font = c.generate_id();
+    xcb::open_font(c, font, "cursor");
 
-	let cursor = c.generate_id();
-	xcb::create_glyph_cursor(c, cursor, font, font, glyph, glyph + 1,
-		0, 0, 0, 0xffff, 0xffff, 0xffff);
+    let cursor = c.generate_id();
+    xcb::create_glyph_cursor(
+        c,
+        cursor,
+        font,
+        font,
+        glyph,
+        glyph + 1,
+        0,
+        0,
+        0,
+        0xffff,
+        0xffff,
+        0xffff,
+    );
 
-	cursor
+    cursor
 }
 
-pub fn create_font_cursor_checked(c: &xcb::Connection, glyph: u16) -> Result<xcb::Cursor, xcb::ReplyError> {
-	let font = c.generate_id();
-	xcb::open_font_checked(c, font, "cursor").request_check()?;
+pub fn create_font_cursor_checked(
+    c: &xcb::Connection,
+    glyph: u16,
+) -> Result<xcb::Cursor, xcb::ReplyError> {
+    let font = c.generate_id();
+    xcb::open_font_checked(c, font, "cursor").request_check()?;
 
-	let cursor = c.generate_id();
-	xcb::create_glyph_cursor(c, cursor, font, font, glyph, glyph + 1,
-		0, 0, 0, 0xffff, 0xffff, 0xffff).request_check()?;
+    let cursor = c.generate_id();
+    xcb::create_glyph_cursor(
+        c,
+        cursor,
+        font,
+        font,
+        glyph,
+        glyph + 1,
+        0,
+        0,
+        0,
+        0xffff,
+        0xffff,
+        0xffff,
+    )
+    .request_check()?;
 
-	Ok(cursor)
+    Ok(cursor)
 }
