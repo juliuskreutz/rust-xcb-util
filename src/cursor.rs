@@ -1,130 +1,228 @@
-use xcb;
+use std::{ffi, fmt, ptr};
 
-pub const NUM_GLYPHS: u16 = 154;
-pub const X_CURSOR: u16 = 0;
-pub const ARROW: u16 = 2;
-pub const BASED_ARROW_DOWN: u16 = 4;
-pub const BASED_ARROW_UP: u16 = 6;
-pub const BOAT: u16 = 8;
-pub const BOGOSITY: u16 = 10;
-pub const BOTTOM_LEFT_CORNER: u16 = 12;
-pub const BOTTOM_RIGHT_CORNER: u16 = 14;
-pub const BOTTOM_SIDE: u16 = 16;
-pub const BOTTOM_TEE: u16 = 18;
-pub const BOX_SPIRAL: u16 = 20;
-pub const CENTER_PTR: u16 = 22;
-pub const CIRCLE: u16 = 24;
-pub const CLOCK: u16 = 26;
-pub const COFFEE_MUG: u16 = 28;
-pub const CROSS: u16 = 30;
-pub const CROSS_REVERSE: u16 = 32;
-pub const CROSSHAIR: u16 = 34;
-pub const DIAMOND_CROSS: u16 = 36;
-pub const DOT: u16 = 38;
-pub const DOTBOX: u16 = 40;
-pub const DOUBLE_ARROW: u16 = 42;
-pub const DRAFT_LARGE: u16 = 44;
-pub const DRAFT_SMALL: u16 = 46;
-pub const DRAPED_BOX: u16 = 48;
-pub const EXCHANGE: u16 = 50;
-pub const FLEUR: u16 = 52;
-pub const GOBBLER: u16 = 54;
-pub const GUMBY: u16 = 56;
-pub const HAND1: u16 = 58;
-pub const HAND2: u16 = 60;
-pub const HEART: u16 = 62;
-pub const ICON: u16 = 64;
-pub const IRON_CROSS: u16 = 66;
-pub const LEFT_PTR: u16 = 68;
-pub const LEFT_SIDE: u16 = 70;
-pub const LEFT_TEE: u16 = 72;
-pub const LEFTBUTTON: u16 = 74;
-pub const LL_ANGLE: u16 = 76;
-pub const LR_ANGLE: u16 = 78;
-pub const MAN: u16 = 80;
-pub const MIDDLEBUTTON: u16 = 82;
-pub const MOUSE: u16 = 84;
-pub const PENCIL: u16 = 86;
-pub const PIRATE: u16 = 88;
-pub const PLUS: u16 = 90;
-pub const QUESTION_ARROW: u16 = 92;
-pub const RIGHT_PTR: u16 = 94;
-pub const RIGHT_SIDE: u16 = 96;
-pub const RIGHT_TEE: u16 = 98;
-pub const RIGHTBUTTON: u16 = 100;
-pub const RTL_LOGO: u16 = 102;
-pub const SAILBOAT: u16 = 104;
-pub const SB_DOWN_ARROW: u16 = 106;
-pub const SB_H_DOUBLE_ARROW: u16 = 108;
-pub const SB_LEFT_ARROW: u16 = 110;
-pub const SB_RIGHT_ARROW: u16 = 112;
-pub const SB_UP_ARROW: u16 = 114;
-pub const SB_V_DOUBLE_ARROW: u16 = 116;
-pub const SHUTTLE: u16 = 118;
-pub const SIZING: u16 = 120;
-pub const SPIDER: u16 = 122;
-pub const SPRAYCAN: u16 = 124;
-pub const STAR: u16 = 126;
-pub const TARGET: u16 = 128;
-pub const TCROSS: u16 = 130;
-pub const TOP_LEFT_ARROW: u16 = 132;
-pub const TOP_LEFT_CORNER: u16 = 134;
-pub const TOP_RIGHT_CORNER: u16 = 136;
-pub const TOP_SIDE: u16 = 138;
-pub const TOP_TEE: u16 = 140;
-pub const TREK: u16 = 142;
-pub const UL_ANGLE: u16 = 144;
-pub const UMBRELLA: u16 = 146;
-pub const UR_ANGLE: u16 = 148;
-pub const WATCH: u16 = 150;
-pub const XTERM: u16 = 152;
+use xcb::{x, Xid, XidNew};
+use xcb_util_sys::*;
 
-pub fn create_font_cursor(c: &xcb::Connection, glyph: u16) -> xcb::Cursor {
-    let font = c.generate_id();
-    xcb::open_font(c, font, "cursor");
-
-    let cursor = c.generate_id();
-    xcb::create_glyph_cursor(
-        c,
-        cursor,
-        font,
-        font,
-        glyph,
-        glyph + 1,
-        0,
-        0,
-        0,
-        0xffff,
-        0xffff,
-        0xffff,
-    );
-
-    cursor
+pub enum Cursor {
+    XCursor,
+    Arrow,
+    BaseArrowDown,
+    BasedArrowUp,
+    Boat,
+    Bogosity,
+    BottomLeftCorner,
+    BottomRightCorner,
+    BottomSide,
+    BottomTee,
+    BoxSpiral,
+    CenterPtr,
+    Circle,
+    Clock,
+    CoffeeMug,
+    Cross,
+    CrossReverse,
+    Crosshair,
+    DiamongCross,
+    Dot,
+    Dotbox,
+    DoubleArrow,
+    DraftLarge,
+    DrawftSmall,
+    DrapedBox,
+    Exchange,
+    Fleur,
+    Gobbler,
+    Gumby,
+    Hand1,
+    Hand2,
+    Heart,
+    Icon,
+    IronCross,
+    LeftPtr,
+    LeftSide,
+    LeftTee,
+    Leftbutton,
+    LlAngle,
+    LrAngle,
+    Man,
+    Middlebutton,
+    Mouse,
+    Pencil,
+    Pirate,
+    Plus,
+    QuestionArrow,
+    RightPtr,
+    RightSide,
+    RightTee,
+    Rightbutton,
+    RtlLogo,
+    Sailboat,
+    SbDownArrow,
+    SbHDoubleArrow,
+    SbLeftArrow,
+    SbRightArrow,
+    SbUpArrow,
+    SbVDoubleArrow,
+    Shuttle,
+    Sizing,
+    Spider,
+    Spraycan,
+    Star,
+    Target,
+    Tcross,
+    TopLeftArrow,
+    TopLeftCorner,
+    TopRightCorner,
+    TopSide,
+    TopTee,
+    Trek,
+    UlAngle,
+    Umbrella,
+    UrAngle,
+    Watch,
+    Xterm,
+    Custom(String),
 }
 
-pub fn create_font_cursor_checked(
-    c: &xcb::Connection,
-    glyph: u16,
-) -> Result<xcb::Cursor, xcb::ReplyError> {
-    let font = c.generate_id();
-    xcb::open_font_checked(c, font, "cursor").request_check()?;
+impl fmt::Display for Cursor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Cursor::XCursor => "X_cursor",
+            Cursor::Arrow => "arrow",
+            Cursor::BaseArrowDown => "based_arrow_down",
+            Cursor::BasedArrowUp => "based_arrow_up",
+            Cursor::Boat => "boat",
+            Cursor::Bogosity => "bogosity",
+            Cursor::BottomLeftCorner => "bottom_left_corner",
+            Cursor::BottomRightCorner => "bottom_right_corner",
+            Cursor::BottomSide => "bottom_side",
+            Cursor::BottomTee => "bottom_tee",
+            Cursor::BoxSpiral => "box_spiral",
+            Cursor::CenterPtr => "center_ptr",
+            Cursor::Circle => "circle",
+            Cursor::Clock => "clock",
+            Cursor::CoffeeMug => "coffee_mug",
+            Cursor::Cross => "cross",
+            Cursor::CrossReverse => "cross_reverse",
+            Cursor::Crosshair => "crosshair",
+            Cursor::DiamongCross => "diamond_cross",
+            Cursor::Dot => "dot",
+            Cursor::Dotbox => "dotbox",
+            Cursor::DoubleArrow => "double_arrow",
+            Cursor::DraftLarge => "draft_large",
+            Cursor::DrawftSmall => "draft_small",
+            Cursor::DrapedBox => "draped_box",
+            Cursor::Exchange => "exchange",
+            Cursor::Fleur => "fleur",
+            Cursor::Gobbler => "gobbler",
+            Cursor::Gumby => "gumby",
+            Cursor::Hand1 => "hand1",
+            Cursor::Hand2 => "hand2",
+            Cursor::Heart => "heart",
+            Cursor::Icon => "icon",
+            Cursor::IronCross => "iron_cross",
+            Cursor::LeftPtr => "left_ptr",
+            Cursor::LeftSide => "left_side",
+            Cursor::LeftTee => "left_tee",
+            Cursor::Leftbutton => "leftbutton",
+            Cursor::LlAngle => "ll_angle",
+            Cursor::LrAngle => "lr_angle",
+            Cursor::Man => "man",
+            Cursor::Middlebutton => "middlebutton",
+            Cursor::Mouse => "mouse",
+            Cursor::Pencil => "pencil",
+            Cursor::Pirate => "pirate",
+            Cursor::Plus => "plus",
+            Cursor::QuestionArrow => "question_arrow",
+            Cursor::RightPtr => "right_ptr",
+            Cursor::RightSide => "right_side",
+            Cursor::RightTee => "right_tee",
+            Cursor::Rightbutton => "rightbutton",
+            Cursor::RtlLogo => "rtl_logo",
+            Cursor::Sailboat => "sailboat",
+            Cursor::SbDownArrow => "sb_down_arrow",
+            Cursor::SbHDoubleArrow => "sb_h_double_arrow",
+            Cursor::SbLeftArrow => "sb_left_arrow",
+            Cursor::SbRightArrow => "sb_right_arrow",
+            Cursor::SbUpArrow => "sb_up_arrow",
+            Cursor::SbVDoubleArrow => "sb_v_double_arrow",
+            Cursor::Shuttle => "shuttle",
+            Cursor::Sizing => "sizing",
+            Cursor::Spider => "spider",
+            Cursor::Spraycan => "spraycan",
+            Cursor::Star => "star",
+            Cursor::Target => "target",
+            Cursor::Tcross => "tcross",
+            Cursor::TopLeftArrow => "top_left_arrow",
+            Cursor::TopLeftCorner => "top_left_corner",
+            Cursor::TopRightCorner => "top_right_corner",
+            Cursor::TopSide => "top_side",
+            Cursor::TopTee => "top_tee",
+            Cursor::Trek => "trek",
+            Cursor::UlAngle => "ul_angle",
+            Cursor::Umbrella => "umbrella",
+            Cursor::UrAngle => "ur_angle",
+            Cursor::Watch => "watch",
+            Cursor::Xterm => "xterm",
+            Cursor::Custom(s) => s,
+        };
 
-    let cursor = c.generate_id();
-    xcb::create_glyph_cursor(
-        c,
-        cursor,
-        font,
-        font,
-        glyph,
-        glyph + 1,
-        0,
-        0,
-        0,
-        0xffff,
-        0xffff,
-        0xffff,
-    )
-    .request_check()?;
+        write!(f, "{s}")
+    }
+}
 
-    Ok(cursor)
+pub struct CursorContext {
+    inner: ptr::NonNull<xcb_cursor_context_t>,
+}
+
+impl CursorContext {
+    pub fn new(connection: &xcb::Connection, screen: &x::Screen) -> Option<Self> {
+        let mut screen = xcb_screen_t {
+            root: screen.root().resource_id(),
+            default_colormap: screen.default_colormap().resource_id(),
+            white_pixel: screen.white_pixel(),
+            black_pixel: screen.black_pixel(),
+            current_input_masks: screen.current_input_masks().bits(),
+            width_in_pixels: screen.width_in_pixels(),
+            height_in_pixels: screen.height_in_pixels(),
+            width_in_millimeters: screen.width_in_millimeters(),
+            height_in_millimeters: screen.height_in_millimeters(),
+            min_installed_maps: screen.min_installed_maps(),
+            max_installed_maps: screen.max_installed_maps(),
+            root_visual: screen.root_visual(),
+            backing_stores: screen.backing_stores() as u8,
+            save_unders: screen.save_unders() as u8,
+            root_depth: screen.root_depth(),
+            allowed_depths_len: screen.allowed_depths().count() as u8,
+        };
+
+        let mut ctx = ptr::null_mut();
+
+        unsafe {
+            xcb_cursor_context_new(
+                connection.get_raw_conn() as *mut xcb_connection_t,
+                &mut screen,
+                &mut ctx,
+            )
+        };
+
+        ptr::NonNull::new(ctx).map(|ctx| Self { inner: ctx })
+    }
+
+    pub fn load_cursor(&self, cursor: Cursor) -> x::Cursor {
+        let c_str = ffi::CString::new(cursor.to_string()).unwrap();
+
+        unsafe {
+            let cursor = xcb_cursor_load_cursor(self.inner.as_ptr(), c_str.as_ptr());
+            x::Cursor::new(cursor)
+        }
+    }
+}
+
+impl Drop for CursorContext {
+    fn drop(&mut self) {
+        unsafe {
+            xcb_cursor_context_free(self.inner.as_ptr());
+        }
+    }
 }
