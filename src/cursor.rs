@@ -1,7 +1,7 @@
 use std::{ffi, fmt, ptr};
 
 use xcb::{x, Xid, XidNew};
-use xcb_util_sys::*;
+use xcb_util_sys::cursor::*;
 
 pub enum Cursor {
     XCursor,
@@ -172,7 +172,7 @@ impl fmt::Display for Cursor {
 }
 
 pub struct CursorContext {
-    inner: ptr::NonNull<xcb_cursor_context_t>,
+    raw: *mut xcb_cursor_context_t,
 }
 
 impl CursorContext {
@@ -196,24 +196,22 @@ impl CursorContext {
             allowed_depths_len: screen.allowed_depths().count() as u8,
         };
 
-        let mut ctx = ptr::null_mut();
+        let mut raw = ptr::null_mut();
 
-        unsafe {
-            xcb_cursor_context_new(
-                connection.get_raw_conn() as *mut xcb_connection_t,
-                &mut screen,
-                &mut ctx,
-            )
-        };
+        unsafe { xcb_cursor_context_new(connection.get_raw_conn(), &mut screen, &mut raw) };
 
-        ptr::NonNull::new(ctx).map(|ctx| Self { inner: ctx })
+        if raw.is_null() {
+            None
+        } else {
+            Some(Self { raw })
+        }
     }
 
     pub fn load_cursor(&self, cursor: Cursor) -> x::Cursor {
         let c_str = ffi::CString::new(cursor.to_string()).unwrap();
 
         unsafe {
-            let cursor = xcb_cursor_load_cursor(self.inner.as_ptr(), c_str.as_ptr());
+            let cursor = xcb_cursor_load_cursor(self.raw, c_str.as_ptr());
             x::Cursor::new(cursor)
         }
     }
@@ -222,7 +220,7 @@ impl CursorContext {
 impl Drop for CursorContext {
     fn drop(&mut self) {
         unsafe {
-            xcb_cursor_context_free(self.inner.as_ptr());
+            xcb_cursor_context_free(self.raw);
         }
     }
 }

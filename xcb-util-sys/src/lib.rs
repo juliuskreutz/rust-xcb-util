@@ -2,4 +2,23 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#[cfg(feature = "cursor")]
+pub mod cursor {
+    pub use xcb::ffi::*;
+
+    include!(concat!(env!("OUT_DIR"), "/cursor.rs"));
+}
+
+#[cfg(feature = "ewmh")]
+pub mod ewmh {
+    pub use xcb::ffi::*;
+
+    include!(concat!(env!("OUT_DIR"), "/ewmh.rs"));
+}
+
+#[cfg(feature = "icccm")]
+pub mod icccm {
+    pub use xcb::ffi::*;
+
+    include!(concat!(env!("OUT_DIR"), "/icccm.rs"));
+}

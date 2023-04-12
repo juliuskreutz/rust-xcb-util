@@ -1,7 +1,7 @@
 macro_rules! define {
     (cookie $cookie:ident for $inner:ident => $reply:ident) => {
-        pub struct $cookie<'a>(
-            xcb::GetPropertyCookie<'a>,
+        pub struct $cookie(
+            x::GetPropertyCookie,
             unsafe extern "C" fn(
                 *mut xcb_connection_t,
                 xcb_get_property_cookie_t,
@@ -11,12 +11,12 @@ macro_rules! define {
         );
 
         #[cfg(feature = "thread")]
-        unsafe impl<'a> Send for $cookie<'a> {}
+        unsafe impl Send for $cookie {}
         #[cfg(feature = "thread")]
-        unsafe impl<'a> Sync for $cookie<'a> {}
+        unsafe impl Sync for $cookie {}
 
-        impl<'a> $cookie<'a> {
-            pub fn get_reply(&self) -> Result<$reply, xcb::ReplyError> {
+        impl $cookie {
+            pub fn get_reply(&self) -> Option<$reply> {
                 unsafe {
                     if self.0.checked {
                         let mut err: *mut xcb_generic_error_t = ptr::null_mut();
@@ -29,11 +29,9 @@ macro_rules! define {
                         );
 
                         if err.is_null() && res != 0 {
-                            Ok($reply(reply))
+                            Some($reply(reply))
                         } else {
-                            Err(xcb::ReplyError::GenericError(xcb::GenericError {
-                                ptr: err,
-                            }))
+                            None
                         }
                     } else {
                         let mut reply = mem::zeroed();
@@ -44,7 +42,7 @@ macro_rules! define {
                             ptr::null_mut(),
                         );
 
-                        Ok($reply(reply))
+                        Some($reply(reply))
                     }
                 }
             }
@@ -52,15 +50,15 @@ macro_rules! define {
     };
 
     (cookie $cookie:ident with $func:ident => $reply:ident) => {
-        pub struct $cookie<'a>(xcb::GetPropertyCookie<'a>);
+        pub struct $cookie(x::GetPropertyCookie);
 
         #[cfg(feature = "thread")]
         unsafe impl<'a> Send for $cookie<'a> {}
         #[cfg(feature = "thread")]
         unsafe impl<'a> Sync for $cookie<'a> {}
 
-        impl<'a> $cookie<'a> {
-            pub fn get_reply(&self) -> Result<$reply, xcb::ReplyError> {
+        impl $cookie {
+            pub fn get_reply(&self) -> Option<$reply> {
                 unsafe {
                     if self.0.checked {
                         let mut err: *mut xcb_generic_error_t = ptr::null_mut();
@@ -73,11 +71,9 @@ macro_rules! define {
                         );
 
                         if err.is_null() && res != 0 {
-                            Ok($reply(reply))
+                            Some($reply(reply))
                         } else {
-                            Err(xcb::ReplyError::GenericError(xcb::GenericError {
-                                ptr: err,
-                            }))
+                            None
                         }
                     } else {
                         let mut reply = mem::zeroed();
@@ -88,7 +84,7 @@ macro_rules! define {
                             ptr::null_mut(),
                         );
 
-                        Ok($reply(reply))
+                        Some($reply(reply))
                     }
                 }
             }

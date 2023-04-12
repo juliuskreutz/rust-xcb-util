@@ -16,8 +16,8 @@ xcb-util-sys = { version = "0.1.0", path = "xcb-util-sys" }
 [features]
 cursor  = ["xcb-util-sys/cursor"]
 ewmh    = ["xcb-util-sys/ewmh"]
+icccm   = ["xcb-util-sys/icccm"]
 
-icccm   = []
 image   = []
 keysyms = []
 misc    = ["icccm"]
