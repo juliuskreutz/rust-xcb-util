@@ -8,6 +8,9 @@ edition = "2021"
 [dependencies]
 xcb = "1.2.0"
 
+[build-dependencies]
+cc = "1.0.79"
+
 [build-dependencies.bindgen]
 version = "0.65.1"
 features = ["experimental"]
