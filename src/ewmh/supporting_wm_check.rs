@@ -1,7 +1,10 @@
-use xcb::{x, Xid, XidNew};
+use std::ptr;
+
+use xcb::x;
 
 use super::{
-    ffi, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
+    ffi, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply,
+    EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
 pub struct SetSupportingWmCheck {
@@ -15,14 +18,14 @@ unsafe impl RawEwmhRequest for SetSupportingWmCheck {
             if checked {
                 ffi::xcb_ewmh_set_supporting_wm_check_checked(
                     ewmh.ewmh.get(),
-                    self.parent_window.resource_id(),
-                    self.child_window.resource_id(),
+                    xcb::Xid::resource_id(&self.parent_window),
+                    xcb::Xid::resource_id(&self.child_window),
                 )
             } else {
                 ffi::xcb_ewmh_set_supporting_wm_check(
                     ewmh.ewmh.get(),
-                    self.parent_window.resource_id(),
-                    self.child_window.resource_id(),
+                    xcb::Xid::resource_id(&self.parent_window),
+                    xcb::Xid::resource_id(&self.child_window),
                 )
             }
             .sequence as u64
@@ -41,11 +44,21 @@ impl EwmhRequestWithoutReply for SetSupportingWmCheck {}
 // TODO: Expose inner reply
 pub struct GetSupportingWmCheckReply {
     raw: *const u8,
+    window: x::Window,
 }
 
-impl xcb::Reply for GetSupportingWmCheckReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetSupportingWmCheckReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut supporting_wm_check = 0;
+
+        ffi::xcb_ewmh_get_supporting_wm_check_from_reply(
+            &mut supporting_wm_check,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        let window = <x::Window as xcb::XidNew>::new(supporting_wm_check);
+
+        Self { raw, window }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -55,16 +68,7 @@ impl xcb::Reply for GetSupportingWmCheckReply {
 
 impl GetSupportingWmCheckReply {
     pub fn window(&self) -> x::Window {
-        unsafe {
-            let mut supporting_wm_check = 0;
-
-            ffi::xcb_ewmh_get_supporting_wm_check_from_reply(
-                &mut supporting_wm_check,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            x::Window::new(supporting_wm_check)
-        }
+        self.window
     }
 }
 
@@ -86,8 +90,29 @@ impl xcb::Cookie for GetSupportingWmCheckCookie {
 
 unsafe impl xcb::CookieChecked for GetSupportingWmCheckCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetSupportingWmCheckCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetSupportingWmCheckCookie {
     type Reply = GetSupportingWmCheckReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut window = 0;
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_supporting_wm_check_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut window,
+                &mut e,
+            );
+
+            let window = <x::Window as xcb::XidNew>::new(window);
+
+            Ok(Self::Reply { raw, window })
+        }
+    }
 }
 
 impl xcb::Cookie for GetSupportingWmCheckCookieUnchecked {
@@ -100,8 +125,32 @@ impl xcb::Cookie for GetSupportingWmCheckCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetSupportingWmCheckCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetSupportingWmCheckCookieUnchecked {
     type Reply = GetSupportingWmCheckReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut window = 0;
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_supporting_wm_check_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut window,
+                &mut e,
+            );
+
+            let window = <x::Window as xcb::XidNew>::new(window);
+
+            Ok(Some(Self::Reply { raw, window }))
+        }
+    }
 }
 
 pub struct GetSupportingWmCheck {
@@ -112,11 +161,14 @@ unsafe impl RawEwmhRequest for GetSupportingWmCheck {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, checked: bool) -> u64 {
         unsafe {
             if checked {
-                ffi::xcb_ewmh_get_supporting_wm_check(ewmh.ewmh.get(), self.window.resource_id())
+                ffi::xcb_ewmh_get_supporting_wm_check(
+                    ewmh.ewmh.get(),
+                    xcb::Xid::resource_id(&self.window),
+                )
             } else {
                 ffi::xcb_ewmh_get_supporting_wm_check_unchecked(
                     ewmh.ewmh.get(),
-                    self.window.resource_id(),
+                    xcb::Xid::resource_id(&self.window),
                 )
             }
             .sequence as u64

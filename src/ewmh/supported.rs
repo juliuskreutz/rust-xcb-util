@@ -50,7 +50,7 @@ pub struct GetSupportedReply {
 }
 
 impl EwmhReply for GetSupportedReply {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut supported = mem::zeroed();
 
         ffi::xcb_ewmh_get_supported_from_reply(

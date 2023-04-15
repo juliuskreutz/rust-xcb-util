@@ -1,7 +1,10 @@
+use std::ptr;
+
 use xcb::x;
 
 use super::{
-    ffi, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
+    ffi, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply,
+    EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
 pub struct SetNumberOfDesktops {
@@ -65,11 +68,19 @@ impl EwmhRequest for RequestChangeNumberOfDesktops {
 // TODO: Expose inner reply
 pub struct GetNumberOfDesktopsReply {
     raw: *const u8,
+    number: u32,
 }
 
-impl xcb::Reply for GetNumberOfDesktopsReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetNumberOfDesktopsReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut number = 0;
+
+        ffi::xcb_ewmh_get_number_of_desktops_from_reply(
+            &mut number,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        Self { raw, number }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -79,16 +90,7 @@ impl xcb::Reply for GetNumberOfDesktopsReply {
 
 impl GetNumberOfDesktopsReply {
     pub fn number(&self) -> u32 {
-        unsafe {
-            let mut number = 0;
-
-            ffi::xcb_ewmh_get_number_of_desktops_from_reply(
-                &mut number,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            number
-        }
+        self.number
     }
 }
 
@@ -110,8 +112,27 @@ impl xcb::Cookie for GetNumberOfDesktopsCookie {
 
 unsafe impl xcb::CookieChecked for GetNumberOfDesktopsCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetNumberOfDesktopsCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetNumberOfDesktopsCookie {
     type Reply = GetNumberOfDesktopsReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut number = 0;
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_number_of_desktops_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut number,
+                &mut e,
+            );
+
+            Ok(Self::Reply { raw, number })
+        }
+    }
 }
 
 impl xcb::Cookie for GetNumberOfDesktopsCookieUnchecked {
@@ -124,8 +145,30 @@ impl xcb::Cookie for GetNumberOfDesktopsCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetNumberOfDesktopsCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetNumberOfDesktopsCookieUnchecked {
     type Reply = GetNumberOfDesktopsReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut number = 0;
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_number_of_desktops_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut number,
+                &mut e,
+            );
+
+            Ok(Some(Self::Reply { raw, number }))
+        }
+    }
 }
 
 pub struct GetNumberOfDesktops {

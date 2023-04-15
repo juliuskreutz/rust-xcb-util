@@ -1,5 +1,7 @@
 use std::{cell::UnsafeCell, mem, ops::Deref, ptr};
 
+use num_derive::FromPrimitive;
+use num_derive::ToPrimitive;
 pub use xcb_util_sys::ewmh as ffi;
 
 mod active_window;
@@ -7,7 +9,7 @@ mod client_list;
 mod client_list_stacking;
 mod current_desktop;
 mod desktop_geometry;
-// mod desktop_layout;
+mod desktop_layout;
 mod desktop_names;
 mod desktop_viewport;
 mod number_of_desktops;
@@ -21,7 +23,7 @@ pub use self::client_list::*;
 pub use self::client_list_stacking::*;
 pub use self::current_desktop::*;
 pub use self::desktop_geometry::*;
-// pub use self::desktop_layout::*;
+pub use self::desktop_layout::*;
 pub use self::desktop_names::*;
 pub use self::desktop_viewport::*;
 pub use self::number_of_desktops::*;
@@ -33,7 +35,7 @@ pub use self::workarea::*;
 pub trait EwmhReply {
     /// # Safety
     /// `raw` must be a pointer to a valid wire representation of `Self`, allocated with [`libc::malloc`].
-    unsafe fn from_raw(raw: *const u8, ewmh: &EwmhConnection) -> Self;
+    unsafe fn from_raw(raw: *const u8, ewmh: *mut ffi::xcb_ewmh_connection_t) -> Self;
 
     /// # Safety
     /// The returned pointer must be freed with [`libc::free`] to avoid any memory leak, or be used
@@ -42,7 +44,7 @@ pub trait EwmhReply {
 }
 
 impl<T: xcb::Reply> EwmhReply for T {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         <T as xcb::Reply>::from_raw(raw)
     }
 
@@ -233,20 +235,20 @@ pub struct Geometry {
     pub height: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, FromPrimitive, ToPrimitive)]
 pub enum ClientSourceType {
     None,
     Normal,
     Other,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, FromPrimitive, ToPrimitive)]
 pub enum DesktopLayoutOrientation {
     Horz,
     Vert,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, FromPrimitive, ToPrimitive)]
 pub enum DesktopLayoutStartingCorner {
     TopLeft,
     TopRight,

@@ -1,10 +1,10 @@
-use std::{mem, slice};
+use std::{mem, ptr, slice};
 
 use xcb::x;
 
 use super::{
-    ffi, Coordinates, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply,
-    RawEwmhRequest,
+    ffi, Coordinates, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked,
+    EwmhReply, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
 pub struct SetDesktopViewport<'a> {
@@ -72,11 +72,27 @@ impl EwmhRequest for RequestChangeDesktopViewport {
 // TODO: Expose inner reply
 pub struct GetDesktopViewportReply {
     raw: *const u8,
+    coordinates: Vec<Coordinates>,
 }
 
-impl xcb::Reply for GetDesktopViewportReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetDesktopViewportReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut vp = mem::zeroed();
+
+        ffi::xcb_ewmh_get_desktop_viewport_from_reply(
+            &mut vp,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        let coordinates = slice::from_raw_parts(
+            vp.desktop_viewport as *mut Coordinates,
+            vp.desktop_viewport_len as usize,
+        )
+        .to_vec();
+
+        ffi::xcb_ewmh_get_desktop_viewport_reply_wipe(&mut vp);
+
+        Self { raw, coordinates }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -85,25 +101,8 @@ impl xcb::Reply for GetDesktopViewportReply {
 }
 
 impl GetDesktopViewportReply {
-    pub fn coordiantes(&self) -> Vec<Coordinates> {
-        unsafe {
-            let mut vp = mem::zeroed();
-
-            ffi::xcb_ewmh_get_desktop_viewport_from_reply(
-                &mut vp,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            let coordiantes = slice::from_raw_parts(
-                vp.desktop_viewport as *mut Coordinates,
-                vp.desktop_viewport_len as usize,
-            )
-            .to_vec();
-
-            ffi::xcb_ewmh_get_desktop_viewport_reply_wipe(&mut vp);
-
-            coordiantes
-        }
+    pub fn coordiantes(&self) -> &[Coordinates] {
+        &self.coordinates
     }
 }
 
@@ -125,8 +124,31 @@ impl xcb::Cookie for GetDesktopViewportCookie {
 
 unsafe impl xcb::CookieChecked for GetDesktopViewportCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetDesktopViewportCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetDesktopViewportCookie {
     type Reply = GetDesktopViewportReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut vp = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw =
+                &ffi::xcb_ewmh_get_desktop_viewport_reply(ewmh.ewmh.get(), cookie, &mut vp, &mut e);
+
+            let coordinates = slice::from_raw_parts(
+                vp.desktop_viewport as *mut Coordinates,
+                vp.desktop_viewport_len as usize,
+            )
+            .to_vec();
+
+            ffi::xcb_ewmh_get_desktop_viewport_reply_wipe(&mut vp);
+
+            Ok(Self::Reply { raw, coordinates })
+        }
+    }
 }
 
 impl xcb::Cookie for GetDesktopViewportCookieUnchecked {
@@ -139,8 +161,34 @@ impl xcb::Cookie for GetDesktopViewportCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetDesktopViewportCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopViewportCookieUnchecked {
     type Reply = GetDesktopViewportReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut vp = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw =
+                &ffi::xcb_ewmh_get_desktop_viewport_reply(ewmh.ewmh.get(), cookie, &mut vp, &mut e);
+
+            let coordinates = slice::from_raw_parts(
+                vp.desktop_viewport as *mut Coordinates,
+                vp.desktop_viewport_len as usize,
+            )
+            .to_vec();
+
+            ffi::xcb_ewmh_get_desktop_viewport_reply_wipe(&mut vp);
+
+            Ok(Some(Self::Reply { raw, coordinates }))
+        }
+    }
 }
 
 pub struct GetDesktopViewport {

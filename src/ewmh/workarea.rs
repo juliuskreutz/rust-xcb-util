@@ -1,10 +1,10 @@
-use std::{mem, slice};
+use std::{mem, ptr, slice};
 
 use xcb::x;
 
 use super::{
-    ffi, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, Geometry,
-    RawEwmhRequest,
+    ffi, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply,
+    EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, Geometry, RawEwmhRequest,
 };
 
 pub struct SetWorkarea<'a> {
@@ -46,11 +46,21 @@ impl<'a> EwmhRequestWithoutReply for SetWorkarea<'a> {}
 // TODO: Expose inner reply
 pub struct GetWorkareaReply {
     raw: *const u8,
+    geometries: Vec<Geometry>,
 }
 
-impl xcb::Reply for GetWorkareaReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetWorkareaReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut wa = mem::zeroed();
+
+        ffi::xcb_ewmh_get_workarea_from_reply(&mut wa, raw as *mut ffi::xcb_get_property_reply_t);
+
+        let geometries =
+            slice::from_raw_parts(wa.workarea as *mut Geometry, wa.workarea_len as usize).to_vec();
+
+        ffi::xcb_ewmh_get_workarea_reply_wipe(&mut wa);
+
+        Self { raw, geometries }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -59,23 +69,8 @@ impl xcb::Reply for GetWorkareaReply {
 }
 
 impl GetWorkareaReply {
-    pub fn geometries(&self) -> Vec<Geometry> {
-        unsafe {
-            let mut wa = mem::zeroed();
-
-            ffi::xcb_ewmh_get_workarea_from_reply(
-                &mut wa,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            let geometries =
-                slice::from_raw_parts(wa.workarea as *mut Geometry, wa.workarea_len as usize)
-                    .to_vec();
-
-            ffi::xcb_ewmh_get_workarea_reply_wipe(&mut wa);
-
-            geometries
-        }
+    pub fn geometries(&self) -> &[Geometry] {
+        &self.geometries
     }
 }
 
@@ -97,8 +92,28 @@ impl xcb::Cookie for GetWorkareaCookie {
 
 unsafe impl xcb::CookieChecked for GetWorkareaCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetWorkareaCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetWorkareaCookie {
     type Reply = GetWorkareaReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut wa = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_workarea_reply(ewmh.ewmh.get(), cookie, &mut wa, &mut e);
+
+            let geometries =
+                slice::from_raw_parts(wa.workarea as *mut Geometry, wa.workarea_len as usize)
+                    .to_vec();
+
+            ffi::xcb_ewmh_get_workarea_reply_wipe(&mut wa);
+
+            Ok(Self::Reply { raw, geometries })
+        }
+    }
 }
 
 impl xcb::Cookie for GetWorkareaCookieUnchecked {
@@ -111,8 +126,31 @@ impl xcb::Cookie for GetWorkareaCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetWorkareaCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetWorkareaCookieUnchecked {
     type Reply = GetWorkareaReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut wa = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_workarea_reply(ewmh.ewmh.get(), cookie, &mut wa, &mut e);
+
+            let geometries =
+                slice::from_raw_parts(wa.workarea as *mut Geometry, wa.workarea_len as usize)
+                    .to_vec();
+
+            ffi::xcb_ewmh_get_workarea_reply_wipe(&mut wa);
+
+            Ok(Some(Self::Reply { raw, geometries }))
+        }
+    }
 }
 
 pub struct GetWorkarea {

@@ -1,9 +1,10 @@
-use std::{mem, slice};
+use std::{mem, ptr, slice};
 
 use xcb::x;
 
 use super::{
-    ffi, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
+    ffi, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply,
+    EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
 pub struct SetDesktopNames<'a> {
@@ -50,11 +51,30 @@ impl<'a> EwmhRequestWithoutReply for SetDesktopNames<'a> {}
 //TODO: Expose inner reply
 pub struct GetDesktopNamesReply {
     raw: *const u8,
+    strings: Vec<String>,
 }
 
-impl xcb::Reply for GetDesktopNamesReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetDesktopNamesReply {
+    unsafe fn from_raw(raw: *const u8, ewmh: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut names = mem::zeroed();
+
+        ffi::xcb_ewmh_get_desktop_names_from_reply(
+            ewmh,
+            &mut names,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
+            names.strings as *mut u8,
+            names.strings_len as usize - 1,
+        ))
+        .split('\0')
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+        ffi::xcb_ewmh_get_utf8_strings_reply_wipe(&mut names);
+
+        Self { raw, strings }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -63,28 +83,8 @@ impl xcb::Reply for GetDesktopNamesReply {
 }
 
 impl GetDesktopNamesReply {
-    pub fn strings(&self, ewmh: &EwmhConnection) -> Vec<String> {
-        unsafe {
-            let mut names = mem::zeroed();
-
-            ffi::xcb_ewmh_get_desktop_names_from_reply(
-                ewmh.ewmh.get(),
-                &mut names,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
-                names.strings as *mut u8,
-                names.strings_len as usize - 1,
-            ))
-            .split('\0')
-            .map(str::to_string)
-            .collect::<Vec<_>>();
-
-            ffi::xcb_ewmh_get_utf8_strings_reply_wipe(&mut names);
-
-            strings
-        }
+    pub fn strings(&self) -> &[String] {
+        &self.strings
     }
 }
 
@@ -106,8 +106,33 @@ impl xcb::Cookie for GetDesktopNamesCookie {
 
 unsafe impl xcb::CookieChecked for GetDesktopNamesCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetDesktopNamesCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetDesktopNamesCookie {
     type Reply = GetDesktopNamesReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut names = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw =
+                &ffi::xcb_ewmh_get_desktop_names_reply(ewmh.ewmh.get(), cookie, &mut names, &mut e);
+
+            let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
+                names.strings as *mut u8,
+                names.strings_len as usize - 1,
+            ))
+            .split('\0')
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+
+            ffi::xcb_ewmh_get_utf8_strings_reply_wipe(&mut names);
+
+            Ok(Self::Reply { raw, strings })
+        }
+    }
 }
 
 impl xcb::Cookie for GetDesktopNamesCookieUnchecked {
@@ -120,8 +145,36 @@ impl xcb::Cookie for GetDesktopNamesCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetDesktopNamesCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopNamesCookieUnchecked {
     type Reply = GetDesktopNamesReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut names = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw =
+                &ffi::xcb_ewmh_get_desktop_names_reply(ewmh.ewmh.get(), cookie, &mut names, &mut e);
+
+            let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
+                names.strings as *mut u8,
+                names.strings_len as usize - 1,
+            ))
+            .split('\0')
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+
+            ffi::xcb_ewmh_get_utf8_strings_reply_wipe(&mut names);
+
+            Ok(Some(Self::Reply { raw, strings }))
+        }
+    }
 }
 
 pub struct GetDesktopNames {

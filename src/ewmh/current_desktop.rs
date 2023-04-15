@@ -1,4 +1,4 @@
-use std::{mem, ptr};
+use std::ptr;
 
 use xcb::x;
 
@@ -74,7 +74,7 @@ pub struct GetCurrentDesktopReply {
 }
 
 impl EwmhReply for GetCurrentDesktopReply {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut current_desktop = 0;
 
         ffi::xcb_ewmh_get_current_desktop_from_reply(
@@ -124,7 +124,7 @@ unsafe impl EwmhCookieWithReplyChecked for GetCurrentDesktopCookie {
             let cookie = ffi::xcb_get_property_cookie_t {
                 sequence: xcb::Cookie::sequence(&self) as u32,
             };
-            let mut window = mem::zeroed();
+            let mut window = 0;
             let mut e = ptr::null_mut();
 
             let raw = &ffi::xcb_ewmh_get_current_desktop_reply(
@@ -162,7 +162,7 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetCurrentDesktopCookieUnchecked {
             let cookie = ffi::xcb_get_property_cookie_t {
                 sequence: xcb::Cookie::sequence(&self) as u32,
             };
-            let mut window = mem::zeroed();
+            let mut window = 0;
             let mut e = ptr::null_mut();
 
             let raw = &ffi::xcb_ewmh_get_current_desktop_reply(

@@ -1,9 +1,10 @@
-use std::{mem, slice};
+use std::{mem, ptr, slice};
 
 use xcb::x;
 
 use super::{
-    ffi, EwmhConnection, EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
+    ffi, EwmhConnection, EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply,
+    EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
 pub struct SetVirtualRoots<'a> {
@@ -45,11 +46,27 @@ impl<'a> EwmhRequestWithoutReply for SetVirtualRoots<'a> {}
 // TODO: Expose inner reply
 pub struct GetVirtualRootsReply {
     raw: *const u8,
+    windows: Vec<x::Window>,
 }
 
-impl xcb::Reply for GetVirtualRootsReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetVirtualRootsReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut clients = mem::zeroed();
+
+        ffi::xcb_ewmh_get_virtual_roots_from_reply(
+            &mut clients,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        let windows = slice::from_raw_parts(
+            clients.windows as *mut x::Window,
+            clients.windows_len as usize,
+        )
+        .to_vec();
+
+        ffi::xcb_ewmh_get_windows_reply_wipe(&mut clients);
+
+        Self { raw, windows }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -58,25 +75,8 @@ impl xcb::Reply for GetVirtualRootsReply {
 }
 
 impl GetVirtualRootsReply {
-    pub fn windows(&self) -> Vec<x::Window> {
-        unsafe {
-            let mut clients = mem::zeroed();
-
-            ffi::xcb_ewmh_get_virtual_roots_from_reply(
-                &mut clients,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
-
-            let windows = slice::from_raw_parts(
-                clients.windows as *mut x::Window,
-                clients.windows_len as usize,
-            )
-            .to_vec();
-
-            ffi::xcb_ewmh_get_windows_reply_wipe(&mut clients);
-
-            windows
-        }
+    pub fn windows(&self) -> &[x::Window] {
+        &self.windows
     }
 }
 
@@ -98,8 +98,35 @@ impl xcb::Cookie for GetVirtualRootsCookie {
 
 unsafe impl xcb::CookieChecked for GetVirtualRootsCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetVirtualRootsCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetVirtualRootsCookie {
     type Reply = GetVirtualRootsReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut clients = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_virtual_roots_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut clients,
+                &mut e,
+            );
+
+            let windows = slice::from_raw_parts(
+                clients.windows as *mut x::Window,
+                clients.windows_len as usize,
+            )
+            .to_vec();
+
+            ffi::xcb_ewmh_get_windows_reply_wipe(&mut clients);
+
+            Ok(Self::Reply { raw, windows })
+        }
+    }
 }
 
 impl xcb::Cookie for GetVirtualRootsCookieUnchecked {
@@ -112,8 +139,38 @@ impl xcb::Cookie for GetVirtualRootsCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetVirtualRootsCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetVirtualRootsCookieUnchecked {
     type Reply = GetVirtualRootsReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut clients = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_virtual_roots_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut clients,
+                &mut e,
+            );
+
+            let windows = slice::from_raw_parts(
+                clients.windows as *mut x::Window,
+                clients.windows_len as usize,
+            )
+            .to_vec();
+
+            ffi::xcb_ewmh_get_windows_reply_wipe(&mut clients);
+
+            Ok(Some(Self::Reply { raw, windows }))
+        }
+    }
 }
 
 pub struct GetVirtualRoots {

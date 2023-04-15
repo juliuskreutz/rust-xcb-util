@@ -1,5 +1,6 @@
-use std::{mem, ptr};
+use std::ptr;
 
+use num_traits::ToPrimitive;
 use xcb::x;
 
 use super::{
@@ -57,7 +58,7 @@ unsafe impl RawEwmhRequest for RequestChangeActiveWindow {
                 ewmh.ewmh.get(),
                 self.screen_nbr,
                 xcb::Xid::resource_id(&self.window_to_activate),
-                self.source_indication as u32,
+                self.source_indication.to_u32().unwrap(),
                 self.timestamp,
                 xcb::Xid::resource_id(&self.current_active_window),
             )
@@ -79,8 +80,8 @@ pub struct GetActiveWindowReply {
 }
 
 impl EwmhReply for GetActiveWindowReply {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
-        let mut window = mem::zeroed();
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut window = 0;
 
         ffi::xcb_ewmh_get_active_window_from_reply(
             &mut window,
@@ -129,7 +130,7 @@ unsafe impl EwmhCookieWithReplyChecked for GetActiveWindowCookie {
             let cookie = ffi::xcb_get_property_cookie_t {
                 sequence: xcb::Cookie::sequence(&self) as u32,
             };
-            let mut window = mem::zeroed();
+            let mut window = 0;
             let mut e = ptr::null_mut();
 
             let raw = &ffi::xcb_ewmh_get_active_window_reply(
@@ -167,7 +168,7 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetActiveWindowCookieUnchecked {
             let cookie = ffi::xcb_get_property_cookie_t {
                 sequence: xcb::Cookie::sequence(&self) as u32,
             };
-            let mut window = mem::zeroed();
+            let mut window = 0;
             let mut e = ptr::null_mut();
 
             let raw = &ffi::xcb_ewmh_get_active_window_reply(

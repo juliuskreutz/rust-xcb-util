@@ -1,9 +1,11 @@
-use std::mem;
+use std::{mem, ptr};
 
-use xcb::{x, Xid, XidNew};
+use num_traits::{FromPrimitive, ToPrimitive};
+use xcb::x;
 
 use super::{
-    ffi, DesktopLayoutOrientation, DesktopLayoutStartingCorner, EwmhConnection, EwmhRequest,
+    ffi, DesktopLayoutOrientation, DesktopLayoutStartingCorner, EwmhConnection,
+    EwmhCookieWithReplyChecked, EwmhCookieWithReplyUnchecked, EwmhReply, EwmhRequest,
     EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
@@ -22,7 +24,7 @@ unsafe impl RawEwmhRequest for SetDesktopLayout {
                 ffi::xcb_ewmh_set_desktop_layout_checked(
                     ewmh.ewmh.get(),
                     self.screen_nbr,
-                    self.orientation as ffi::xcb_ewmh_desktop_layout_orientation_t,
+                    self.orientation.to_u32().unwrap(),
                     self.columns,
                     self.rows,
                     self.starting_corner as ffi::xcb_ewmh_desktop_layout_starting_corner_t,
@@ -31,7 +33,7 @@ unsafe impl RawEwmhRequest for SetDesktopLayout {
                 ffi::xcb_ewmh_set_desktop_layout(
                     ewmh.ewmh.get(),
                     self.screen_nbr,
-                    self.orientation as ffi::xcb_ewmh_desktop_layout_orientation_t,
+                    self.orientation.to_u32().unwrap(),
                     self.columns,
                     self.rows,
                     self.starting_corner as ffi::xcb_ewmh_desktop_layout_starting_corner_t,
@@ -53,11 +55,34 @@ impl EwmhRequestWithoutReply for SetDesktopLayout {}
 // TODO: Expose inner reply
 pub struct GetDesktopLayoutReply {
     raw: *const u8,
+    orientation: DesktopLayoutOrientation,
+    columns: u32,
+    rows: u32,
+    starting_corner: DesktopLayoutStartingCorner,
 }
 
-impl xcb::Reply for GetDesktopLayoutReply {
-    unsafe fn from_raw(raw: *const u8) -> Self {
-        Self { raw }
+impl EwmhReply for GetDesktopLayoutReply {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
+        let mut desktop_layout = mem::zeroed();
+
+        ffi::xcb_ewmh_get_desktop_layout_from_reply(
+            &mut desktop_layout,
+            raw as *mut ffi::xcb_get_property_reply_t,
+        );
+
+        let orientation = DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+        let columns = desktop_layout.columns;
+        let rows = desktop_layout.rows;
+        let starting_corner =
+            DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+
+        Self {
+            raw,
+            orientation,
+            columns,
+            rows,
+            starting_corner,
+        }
     }
 
     unsafe fn into_raw(self) -> *const u8 {
@@ -66,17 +91,20 @@ impl xcb::Reply for GetDesktopLayoutReply {
 }
 
 impl GetDesktopLayoutReply {
-    pub fn window(&self) -> x::Window {
-        unsafe {
-            let mut desktop_layout = mem::zeroed();
+    pub fn orientation(&self) -> DesktopLayoutOrientation {
+        self.orientation
+    }
 
-            ffi::xcb_ewmh_get_desktop_layout_from_reply(
-                &mut desktop_layout,
-                self.raw as *mut ffi::xcb_get_property_reply_t,
-            );
+    pub fn columns(&self) -> u32 {
+        self.columns
+    }
 
-            desktop_layout.
-        }
+    pub fn rows(&self) -> u32 {
+        self.rows
+    }
+
+    pub fn starting_corner(&self) -> DesktopLayoutStartingCorner {
+        self.starting_corner
     }
 }
 
@@ -98,8 +126,40 @@ impl xcb::Cookie for GetDesktopLayoutCookie {
 
 unsafe impl xcb::CookieChecked for GetDesktopLayoutCookie {}
 
-unsafe impl xcb::CookieWithReplyChecked for GetDesktopLayoutCookie {
+unsafe impl EwmhCookieWithReplyChecked for GetDesktopLayoutCookie {
     type Reply = GetDesktopLayoutReply;
+
+    fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut desktop_layout = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_desktop_layout_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut desktop_layout,
+                &mut e,
+            );
+
+            let orientation =
+                DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+            let columns = desktop_layout.columns;
+            let rows = desktop_layout.rows;
+            let starting_corner =
+                DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+
+            Ok(Self::Reply {
+                raw,
+                orientation,
+                columns,
+                rows,
+                starting_corner,
+            })
+        }
+    }
 }
 
 impl xcb::Cookie for GetDesktopLayoutCookieUnchecked {
@@ -112,8 +172,43 @@ impl xcb::Cookie for GetDesktopLayoutCookieUnchecked {
     }
 }
 
-unsafe impl xcb::CookieWithReplyUnchecked for GetDesktopLayoutCookieUnchecked {
+unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopLayoutCookieUnchecked {
     type Reply = GetDesktopLayoutReply;
+
+    fn wait_for_reply_unchecked(
+        self,
+        ewmh: &EwmhConnection,
+    ) -> xcb::ConnResult<Option<Self::Reply>> {
+        unsafe {
+            let cookie = ffi::xcb_get_property_cookie_t {
+                sequence: xcb::Cookie::sequence(&self) as u32,
+            };
+            let mut desktop_layout = mem::zeroed();
+            let mut e = ptr::null_mut();
+
+            let raw = &ffi::xcb_ewmh_get_desktop_layout_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut desktop_layout,
+                &mut e,
+            );
+
+            let orientation =
+                DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+            let columns = desktop_layout.columns;
+            let rows = desktop_layout.rows;
+            let starting_corner =
+                DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+
+            Ok(Some(Self::Reply {
+                raw,
+                orientation,
+                columns,
+                rows,
+                starting_corner,
+            }))
+        }
+    }
 }
 
 pub struct GetDesktopLayout {

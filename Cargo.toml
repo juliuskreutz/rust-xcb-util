@@ -12,6 +12,8 @@ keywords    = ["x11", "xcb"]
 [dependencies]
 xcb  = "1.2.0"
 xcb-util-sys = { version = "0.1.0", path = "xcb-util-sys" }
+num-traits = "0.2.15"
+num-derive = "0.3.3"
 
 [features]
 cursor  = ["xcb-util-sys/cursor"]

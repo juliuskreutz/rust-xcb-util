@@ -78,7 +78,7 @@ pub struct GetDesktopGeometryReply {
 }
 
 impl EwmhReply for GetDesktopGeometryReply {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut width = 0;
         let mut height = 0;
 

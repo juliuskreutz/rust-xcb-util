@@ -50,7 +50,7 @@ pub struct GetClientListReply {
 }
 
 impl EwmhReply for GetClientListReply {
-    unsafe fn from_raw(raw: *const u8, _: &EwmhConnection) -> Self {
+    unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut clients = mem::zeroed();
 
         ffi::xcb_ewmh_get_client_list_stacking_from_reply(
