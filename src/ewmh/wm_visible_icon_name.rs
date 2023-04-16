@@ -7,12 +7,12 @@ use super::{
     EwmhRequest, EwmhRequestWithReply, EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
-pub struct SetDesktopNames<'a> {
-    pub screen_nbr: i32,
+pub struct SetWmVisibleIconName<'a> {
+    pub window: x::Window,
     pub strings: &'a [&'a str],
 }
 
-unsafe impl<'a> RawEwmhRequest for SetDesktopNames<'a> {
+unsafe impl<'a> RawEwmhRequest for SetWmVisibleIconName<'a> {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, checked: bool) -> u64 {
         unsafe {
             let mut strings = self.strings.join("\0");
@@ -21,16 +21,16 @@ unsafe impl<'a> RawEwmhRequest for SetDesktopNames<'a> {
             let strings = strings.as_bytes();
 
             if checked {
-                ffi::xcb_ewmh_set_desktop_names_checked(
+                ffi::xcb_ewmh_set_wm_visible_icon_name_checked(
                     ewmh.ewmh.get(),
-                    self.screen_nbr,
+                    xcb::Xid::resource_id(&self.window),
                     strings.len() as u32,
                     strings.as_ptr() as *const i8,
                 )
             } else {
-                ffi::xcb_ewmh_set_desktop_names(
+                ffi::xcb_ewmh_set_wm_visible_icon_name(
                     ewmh.ewmh.get(),
-                    self.screen_nbr,
+                    xcb::Xid::resource_id(&self.window),
                     strings.len() as u32,
                     strings.as_ptr() as *const i8,
                 )
@@ -40,25 +40,25 @@ unsafe impl<'a> RawEwmhRequest for SetDesktopNames<'a> {
     }
 }
 
-impl<'a> EwmhRequest for SetDesktopNames<'a> {
+impl<'a> EwmhRequest for SetWmVisibleIconName<'a> {
     type Cookie = xcb::VoidCookie;
 
     const IS_VOID: bool = true;
 }
 
-impl<'a> EwmhRequestWithoutReply for SetDesktopNames<'a> {}
+impl<'a> EwmhRequestWithoutReply for SetWmVisibleIconName<'a> {}
 
 //TODO: Expose inner reply
-pub struct GetDesktopNamesReply {
+pub struct GetWmVisibleIconNameReply {
     raw: *const u8,
     strings: Vec<String>,
 }
 
-impl EwmhReply for GetDesktopNamesReply {
+impl EwmhReply for GetWmVisibleIconNameReply {
     unsafe fn from_raw(raw: *const u8, ewmh: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut names = mem::zeroed();
 
-        ffi::xcb_ewmh_get_desktop_names_from_reply(
+        ffi::xcb_ewmh_get_wm_visible_icon_name_from_reply(
             ewmh,
             &mut names,
             raw as *mut ffi::xcb_get_property_reply_t,
@@ -82,19 +82,19 @@ impl EwmhReply for GetDesktopNamesReply {
     }
 }
 
-impl GetDesktopNamesReply {
+impl GetWmVisibleIconNameReply {
     pub fn strings(&self) -> &[String] {
         &self.strings
     }
 }
 
 //TODO: Expose inner cookie
-pub struct GetDesktopNamesCookie(x::GetPropertyCookie);
+pub struct GetWmVisibleIconNameCookie(x::GetPropertyCookie);
 
 //TODO: Expose inner cookie
-pub struct GetDesktopNamesCookieUnchecked(x::GetPropertyCookieUnchecked);
+pub struct GetWmVisibleIconNameCookieUnchecked(x::GetPropertyCookieUnchecked);
 
-impl xcb::Cookie for GetDesktopNamesCookie {
+impl xcb::Cookie for GetWmVisibleIconNameCookie {
     unsafe fn from_sequence(seq: u64) -> Self {
         Self(x::GetPropertyCookie::from_sequence(seq))
     }
@@ -104,10 +104,10 @@ impl xcb::Cookie for GetDesktopNamesCookie {
     }
 }
 
-unsafe impl xcb::CookieChecked for GetDesktopNamesCookie {}
+unsafe impl xcb::CookieChecked for GetWmVisibleIconNameCookie {}
 
-unsafe impl EwmhCookieWithReplyChecked for GetDesktopNamesCookie {
-    type Reply = GetDesktopNamesReply;
+unsafe impl EwmhCookieWithReplyChecked for GetWmVisibleIconNameCookie {
+    type Reply = GetWmVisibleIconNameReply;
 
     fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
         unsafe {
@@ -117,8 +117,12 @@ unsafe impl EwmhCookieWithReplyChecked for GetDesktopNamesCookie {
             let mut names = mem::zeroed();
             let mut e = ptr::null_mut();
 
-            let raw =
-                &ffi::xcb_ewmh_get_desktop_names_reply(ewmh.ewmh.get(), cookie, &mut names, &mut e);
+            let raw = &ffi::xcb_ewmh_get_wm_visible_icon_name_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut names,
+                &mut e,
+            );
 
             let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
                 names.strings as *mut u8,
@@ -135,7 +139,7 @@ unsafe impl EwmhCookieWithReplyChecked for GetDesktopNamesCookie {
     }
 }
 
-impl xcb::Cookie for GetDesktopNamesCookieUnchecked {
+impl xcb::Cookie for GetWmVisibleIconNameCookieUnchecked {
     unsafe fn from_sequence(seq: u64) -> Self {
         Self(x::GetPropertyCookieUnchecked::from_sequence(seq))
     }
@@ -145,8 +149,8 @@ impl xcb::Cookie for GetDesktopNamesCookieUnchecked {
     }
 }
 
-unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopNamesCookieUnchecked {
-    type Reply = GetDesktopNamesReply;
+unsafe impl EwmhCookieWithReplyUnchecked for GetWmVisibleIconNameCookieUnchecked {
+    type Reply = GetWmVisibleIconNameReply;
 
     fn wait_for_reply_unchecked(
         self,
@@ -159,8 +163,12 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopNamesCookieUnchecked {
             let mut names = mem::zeroed();
             let mut e = ptr::null_mut();
 
-            let raw =
-                &ffi::xcb_ewmh_get_desktop_names_reply(ewmh.ewmh.get(), cookie, &mut names, &mut e);
+            let raw = &ffi::xcb_ewmh_get_wm_visible_icon_name_reply(
+                ewmh.ewmh.get(),
+                cookie,
+                &mut names,
+                &mut e,
+            );
 
             let strings = std::str::from_utf8_unchecked(slice::from_raw_parts(
                 names.strings as *mut u8,
@@ -177,31 +185,37 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopNamesCookieUnchecked {
     }
 }
 
-pub struct GetDesktopNames {
-    pub screen_nbr: i32,
+pub struct GetWmVisibleIconName {
+    pub window: x::Window,
 }
 
-unsafe impl RawEwmhRequest for GetDesktopNames {
+unsafe impl RawEwmhRequest for GetWmVisibleIconName {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, checked: bool) -> u64 {
         unsafe {
             if checked {
-                ffi::xcb_ewmh_get_desktop_names(ewmh.ewmh.get(), self.screen_nbr)
+                ffi::xcb_ewmh_get_wm_visible_icon_name(
+                    ewmh.ewmh.get(),
+                    xcb::Xid::resource_id(&self.window),
+                )
             } else {
-                ffi::xcb_ewmh_get_desktop_names_unchecked(ewmh.ewmh.get(), self.screen_nbr)
+                ffi::xcb_ewmh_get_wm_visible_icon_name_unchecked(
+                    ewmh.ewmh.get(),
+                    xcb::Xid::resource_id(&self.window),
+                )
             }
             .sequence as u64
         }
     }
 }
 
-impl EwmhRequest for GetDesktopNames {
-    type Cookie = GetDesktopNamesCookie;
+impl EwmhRequest for GetWmVisibleIconName {
+    type Cookie = GetWmVisibleIconNameCookie;
 
     const IS_VOID: bool = false;
 }
 
-impl EwmhRequestWithReply for GetDesktopNames {
-    type Reply = GetDesktopNamesReply;
-    type Cookie = GetDesktopNamesCookie;
-    type CookieUnchecked = GetDesktopNamesCookieUnchecked;
+impl EwmhRequestWithReply for GetWmVisibleIconName {
+    type Reply = GetWmVisibleIconNameReply;
+    type Cookie = GetWmVisibleIconNameCookie;
+    type CookieUnchecked = GetWmVisibleIconNameCookieUnchecked;
 }

@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-extern crate num_derive;
-extern crate num_traits;
+#[macro_use]
+extern crate bitflags;
 extern crate xcb;
 extern crate xcb_util_sys;
 

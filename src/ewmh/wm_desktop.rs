@@ -8,25 +8,25 @@ use super::{
     EwmhRequestWithoutReply, RawEwmhRequest,
 };
 
-pub struct SetActiveWindow {
-    pub screen_nbr: i32,
-    pub new_active_window: x::Window,
+pub struct SetWmDesktop {
+    pub window: x::Window,
+    pub desktop: u32,
 }
 
-unsafe impl RawEwmhRequest for SetActiveWindow {
+unsafe impl RawEwmhRequest for SetWmDesktop {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, checked: bool) -> u64 {
         unsafe {
             if checked {
-                ffi::xcb_ewmh_set_active_window_checked(
+                ffi::xcb_ewmh_set_wm_desktop_checked(
                     ewmh.ewmh.get(),
-                    self.screen_nbr,
-                    xcb::Xid::resource_id(&self.new_active_window),
+                    xcb::Xid::resource_id(&self.window),
+                    self.desktop,
                 )
             } else {
-                ffi::xcb_ewmh_set_active_window(
+                ffi::xcb_ewmh_set_wm_desktop(
                     ewmh.ewmh.get(),
-                    self.screen_nbr,
-                    xcb::Xid::resource_id(&self.new_active_window),
+                    xcb::Xid::resource_id(&self.window),
+                    self.desktop,
                 )
             }
             .sequence as u64
@@ -34,55 +34,53 @@ unsafe impl RawEwmhRequest for SetActiveWindow {
     }
 }
 
-impl EwmhRequest for SetActiveWindow {
+impl EwmhRequest for SetWmDesktop {
     type Cookie = xcb::VoidCookie;
 
     const IS_VOID: bool = true;
 }
 
-impl EwmhRequestWithoutReply for SetActiveWindow {}
+impl EwmhRequestWithoutReply for SetWmDesktop {}
 
-pub struct RequestChangeActiveWindow {
+pub struct RequestChangeWmDesktop {
     pub screen_nbr: i32,
-    pub window_to_activate: x::Window,
-    pub timestamp: x::Timestamp,
+    pub client_window: x::Window,
+    pub new_desktop: u32,
     pub source_indication: ClientSourceType,
-    pub current_active_window: x::Window,
 }
 
-unsafe impl RawEwmhRequest for RequestChangeActiveWindow {
+unsafe impl RawEwmhRequest for RequestChangeWmDesktop {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, _: bool) -> u64 {
         unsafe {
-            ffi::xcb_ewmh_request_change_active_window(
+            ffi::xcb_ewmh_request_change_wm_desktop(
                 ewmh.ewmh.get(),
                 self.screen_nbr,
-                xcb::Xid::resource_id(&self.window_to_activate),
+                xcb::Xid::resource_id(&self.client_window),
+                self.new_desktop,
                 self.source_indication as u32,
-                self.timestamp,
-                xcb::Xid::resource_id(&self.current_active_window),
             )
             .sequence as u64
         }
     }
 }
 
-impl EwmhRequest for RequestChangeActiveWindow {
+impl EwmhRequest for RequestChangeWmDesktop {
     type Cookie = xcb::VoidCookie;
 
     const IS_VOID: bool = true;
 }
 
 // TODO: Expose inner reply
-pub struct GetActiveWindowReply {
+pub struct GetWmDesktopReply {
     raw: *const u8,
     window: x::Window,
 }
 
-impl EwmhReply for GetActiveWindowReply {
+impl EwmhReply for GetWmDesktopReply {
     unsafe fn from_raw(raw: *const u8, _: *mut ffi::xcb_ewmh_connection_t) -> Self {
         let mut window = 0;
 
-        ffi::xcb_ewmh_get_active_window_from_reply(
+        ffi::xcb_ewmh_get_wm_desktop_from_reply(
             &mut window,
             raw as *mut ffi::xcb_get_property_reply_t,
         );
@@ -97,19 +95,19 @@ impl EwmhReply for GetActiveWindowReply {
     }
 }
 
-impl GetActiveWindowReply {
+impl GetWmDesktopReply {
     pub fn window(&self) -> x::Window {
         self.window
     }
 }
 
 //TODO: Expose inner cookie
-pub struct GetActiveWindowCookie(x::GetPropertyCookie);
+pub struct GetWmDesktopCookie(x::GetPropertyCookie);
 
 //TODO: Expose inner cookie
-pub struct GetActiveWindowCookieUnchecked(x::GetPropertyCookieUnchecked);
+pub struct GetWmDesktopCookieUnchecked(x::GetPropertyCookieUnchecked);
 
-impl xcb::Cookie for GetActiveWindowCookie {
+impl xcb::Cookie for GetWmDesktopCookie {
     unsafe fn from_sequence(seq: u64) -> Self {
         Self(x::GetPropertyCookie::from_sequence(seq))
     }
@@ -119,10 +117,10 @@ impl xcb::Cookie for GetActiveWindowCookie {
     }
 }
 
-unsafe impl xcb::CookieChecked for GetActiveWindowCookie {}
+unsafe impl xcb::CookieChecked for GetWmDesktopCookie {}
 
-unsafe impl EwmhCookieWithReplyChecked for GetActiveWindowCookie {
-    type Reply = GetActiveWindowReply;
+unsafe impl EwmhCookieWithReplyChecked for GetWmDesktopCookie {
+    type Reply = GetWmDesktopReply;
 
     fn wait_for_reply(self, ewmh: &EwmhConnection) -> xcb::Result<Self::Reply> {
         unsafe {
@@ -132,12 +130,8 @@ unsafe impl EwmhCookieWithReplyChecked for GetActiveWindowCookie {
             let mut window = 0;
             let mut e = ptr::null_mut();
 
-            let raw = &ffi::xcb_ewmh_get_active_window_reply(
-                ewmh.ewmh.get(),
-                cookie,
-                &mut window,
-                &mut e,
-            );
+            let raw =
+                &ffi::xcb_ewmh_get_wm_desktop_reply(ewmh.ewmh.get(), cookie, &mut window, &mut e);
 
             let window = <x::Window as xcb::XidNew>::new(window);
 
@@ -146,7 +140,7 @@ unsafe impl EwmhCookieWithReplyChecked for GetActiveWindowCookie {
     }
 }
 
-impl xcb::Cookie for GetActiveWindowCookieUnchecked {
+impl xcb::Cookie for GetWmDesktopCookieUnchecked {
     unsafe fn from_sequence(seq: u64) -> Self {
         Self(x::GetPropertyCookieUnchecked::from_sequence(seq))
     }
@@ -156,8 +150,8 @@ impl xcb::Cookie for GetActiveWindowCookieUnchecked {
     }
 }
 
-unsafe impl EwmhCookieWithReplyUnchecked for GetActiveWindowCookieUnchecked {
-    type Reply = GetActiveWindowReply;
+unsafe impl EwmhCookieWithReplyUnchecked for GetWmDesktopCookieUnchecked {
+    type Reply = GetWmDesktopReply;
 
     fn wait_for_reply_unchecked(
         self,
@@ -170,12 +164,8 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetActiveWindowCookieUnchecked {
             let mut window = 0;
             let mut e = ptr::null_mut();
 
-            let raw = &ffi::xcb_ewmh_get_active_window_reply(
-                ewmh.ewmh.get(),
-                cookie,
-                &mut window,
-                &mut e,
-            );
+            let raw =
+                &ffi::xcb_ewmh_get_wm_desktop_reply(ewmh.ewmh.get(), cookie, &mut window, &mut e);
 
             let window = <x::Window as xcb::XidNew>::new(window);
 
@@ -184,31 +174,34 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetActiveWindowCookieUnchecked {
     }
 }
 
-pub struct GetActiveWindow {
-    pub screen_nbr: i32,
+pub struct GetWmDesktop {
+    pub window: x::Window,
 }
 
-unsafe impl RawEwmhRequest for GetActiveWindow {
+unsafe impl RawEwmhRequest for GetWmDesktop {
     fn raw_ewmh_request(&self, ewmh: &EwmhConnection, checked: bool) -> u64 {
         unsafe {
             if checked {
-                ffi::xcb_ewmh_get_active_window(ewmh.ewmh.get(), self.screen_nbr)
+                ffi::xcb_ewmh_get_wm_desktop(ewmh.ewmh.get(), xcb::Xid::resource_id(&self.window))
             } else {
-                ffi::xcb_ewmh_get_active_window_unchecked(ewmh.ewmh.get(), self.screen_nbr)
+                ffi::xcb_ewmh_get_wm_desktop_unchecked(
+                    ewmh.ewmh.get(),
+                    xcb::Xid::resource_id(&self.window),
+                )
             }
             .sequence as u64
         }
     }
 }
 
-impl EwmhRequest for GetActiveWindow {
-    type Cookie = GetActiveWindowCookie;
+impl EwmhRequest for GetWmDesktop {
+    type Cookie = GetWmDesktopCookie;
 
     const IS_VOID: bool = false;
 }
 
-impl EwmhRequestWithReply for GetActiveWindow {
-    type Reply = GetActiveWindowReply;
-    type Cookie = GetActiveWindowCookie;
-    type CookieUnchecked = GetActiveWindowCookieUnchecked;
+impl EwmhRequestWithReply for GetWmDesktop {
+    type Reply = GetWmDesktopReply;
+    type Cookie = GetWmDesktopCookie;
+    type CookieUnchecked = GetWmDesktopCookieUnchecked;
 }

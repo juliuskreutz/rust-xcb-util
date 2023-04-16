@@ -1,6 +1,5 @@
 use std::{mem, ptr};
 
-use num_traits::{FromPrimitive, ToPrimitive};
 use xcb::x;
 
 use super::{
@@ -24,7 +23,7 @@ unsafe impl RawEwmhRequest for SetDesktopLayout {
                 ffi::xcb_ewmh_set_desktop_layout_checked(
                     ewmh.ewmh.get(),
                     self.screen_nbr,
-                    self.orientation.to_u32().unwrap(),
+                    self.orientation as u32,
                     self.columns,
                     self.rows,
                     self.starting_corner as ffi::xcb_ewmh_desktop_layout_starting_corner_t,
@@ -33,7 +32,7 @@ unsafe impl RawEwmhRequest for SetDesktopLayout {
                 ffi::xcb_ewmh_set_desktop_layout(
                     ewmh.ewmh.get(),
                     self.screen_nbr,
-                    self.orientation.to_u32().unwrap(),
+                    self.orientation as u32,
                     self.columns,
                     self.rows,
                     self.starting_corner as ffi::xcb_ewmh_desktop_layout_starting_corner_t,
@@ -70,11 +69,10 @@ impl EwmhReply for GetDesktopLayoutReply {
             raw as *mut ffi::xcb_get_property_reply_t,
         );
 
-        let orientation = DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+        let orientation = DesktopLayoutOrientation::from(desktop_layout.orientation);
         let columns = desktop_layout.columns;
         let rows = desktop_layout.rows;
-        let starting_corner =
-            DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+        let starting_corner = DesktopLayoutStartingCorner::from(desktop_layout.starting_corner);
 
         Self {
             raw,
@@ -144,12 +142,10 @@ unsafe impl EwmhCookieWithReplyChecked for GetDesktopLayoutCookie {
                 &mut e,
             );
 
-            let orientation =
-                DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+            let orientation = DesktopLayoutOrientation::from(desktop_layout.orientation);
             let columns = desktop_layout.columns;
             let rows = desktop_layout.rows;
-            let starting_corner =
-                DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+            let starting_corner = DesktopLayoutStartingCorner::from(desktop_layout.starting_corner);
 
             Ok(Self::Reply {
                 raw,
@@ -193,12 +189,10 @@ unsafe impl EwmhCookieWithReplyUnchecked for GetDesktopLayoutCookieUnchecked {
                 &mut e,
             );
 
-            let orientation =
-                DesktopLayoutOrientation::from_u32(desktop_layout.orientation).unwrap();
+            let orientation = DesktopLayoutOrientation::from(desktop_layout.orientation);
             let columns = desktop_layout.columns;
             let rows = desktop_layout.rows;
-            let starting_corner =
-                DesktopLayoutStartingCorner::from_u32(desktop_layout.starting_corner).unwrap();
+            let starting_corner = DesktopLayoutStartingCorner::from(desktop_layout.starting_corner);
 
             Ok(Some(Self::Reply {
                 raw,
